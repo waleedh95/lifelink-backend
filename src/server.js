@@ -1,67 +1,42 @@
-// src/server.js
 import express from "express";
 import dotenv from "dotenv";
 import pgclient from "./db.js";
-import cors from 'cors';
-import hospitalRoutes from './routes/hospital.js';
+import cors from "cors";
 
-// ——— AUTH0 DISABLED ———
-// import expressOIDC from "express-openid-connect"; // Auth0 SDK
-// const { auth, requiresAuth } = expressOIDC;
+import hospitalRoutes from "./routes/hospital.js";
+import donorRoutes    from "./routes/donor.js";
 
 dotenv.config();
 
-// connect to postgres
-pgclient.connect()
+// 1) Connect to Postgres
+pgclient
+  .connect()
   .then(() => console.log("✅ Connected to Postgres"))
   .catch(err => console.error("❌ Postgres connection error:", err));
 
 const app = express();
+
+// 2) JSON + CORS
 app.use(express.json());
-
-// ——— STUB OUT requiresAuth ———
-const requiresAuth = () => (_req, _res, next) => next();
-
-// ——— COMMENT OUT ACTUAL AUTH0 MIDDLEWARE ———
-// app.use(
-//   auth({
-//     authRequired: false,
-//     auth0Logout:  true,
-//     secret:       process.env.AUTH0_SECRET,
-//     baseURL:      process.env.AUTH0_BASE_URL,
-//     clientID:     process.env.AUTH0_CLIENT_ID,
-//     issuerBaseURL:process.env.AUTH0_ISSUER_BASE_URL
-//   })
-// );
-
-const frontend = process.env.FRONTEND_URL;
 app.use(
   cors({
-    origin: frontend,
+    origin: process.env.FRONTEND_URL || "*", 
     credentials: true,
   })
 );
 
-// public route
-app.get("/", (req, res) => {
-  res.send('🩸 Welcome to LifeLink API. (Auth0 disabled for testing)');
+// 3) Health-check
+app.get("/", (_req, res) => {
+  res.send("🩸 LifeLink API (no auth)");
 });
 
-// ——— COMMENT OUT PROTECTED EXAMPLES ———
-// app.get("/profile", requiresAuth(), (req, res) => {
-//   res.json(req.oidc.user);
-// });
+// 4) Mount hospital‐side CRUD at /api/requests
+app.use("/api/requests", hospitalRoutes);
 
-// app.get("/api/requests", requiresAuth(), async (req, res) => { /*…*/ });
+// 5) Mount donor‐side CRUD at /api/donor
+app.use("/api/donor", donorRoutes);
 
-app.set('trust proxy', 1);
-
-// now mount your hospital CRUD router (no more requiresAuth)
-app.use(
-  '/api/requests',
-  hospitalRoutes
-);
-
+// 6) Start server
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
   console.log(`🩸 LifeLink backend listening on ${PORT}`)
